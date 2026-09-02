@@ -265,7 +265,7 @@ Kamailio/OpenSIPS (signaling) + RTPEngine + Asterisk/FreeSWITCH (IVR, очере
 | Signaling / медиа | LiveKit server (`deploy/livekit.yaml`) |
 | NAT | встроенный TURN LiveKit |
 | Auth приложения | пока открытый token endpoint (для демо) |
-| Соседство на VPS | `deploy/COEXIST.md` |
+| Соседство на VPS | отдельный compose, Caddy `server_name`, sslip.io, UDP в firewall руками (`deploy/COEXIST.md`) |
 
 Пользователей существующего приложения подключать сюда следующим шагом: token API должен проверять их сессию и только потом подписывать LiveKit JWT.
 
@@ -319,6 +319,6 @@ idle → calling → ringing → in_call → ended
 Дальше:
 
 1. Прогнать две вкладки локально (`bash scripts/dev.sh`).
-2. На VPS — checklist из `deploy/COEXIST.md` (порты, nginx, поддомены).
+2. На VPS — `deploy/COEXIST.md`: отдельный compose, Caddy `server_name`, sslip.io, UDP в firewall руками.
 3. Закрыть token endpoint авторизацией существующего приложения.
 4. Мобильные SDK, входящие, SIP/PSTN — только если понадобятся.
