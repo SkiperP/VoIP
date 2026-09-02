@@ -135,13 +135,19 @@ async function connect(identity: string, roomName: string) {
   next.on(RoomEvent.Reconnected, () => setStatus("live", "на линии"));
 
   await next.connect(session.url, session.token);
-  await next.localParticipant.setMicrophoneEnabled(true);
-  micEnabled = true;
+  try {
+    await next.localParticipant.setMicrophoneEnabled(true);
+    micEnabled = true;
+  } catch (err) {
+    micEnabled = false;
+    console.warn(err);
+    showError("Микрофон недоступен — вы на линии без публикации звука.");
+  }
   room = next;
 
   roomLabel.textContent = session.room;
   youLabel.textContent = session.identity;
-  muteBtn.textContent = "Микрофон вкл";
+  muteBtn.textContent = micEnabled ? "Микрофон вкл" : "Микрофон выкл";
   form.classList.add("hidden");
   callEl.classList.remove("hidden");
   setStatus("live", "на линии");
