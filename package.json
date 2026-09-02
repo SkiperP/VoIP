@@ -1,0 +1,8 @@
+{
+  "name": "voip-line",
+  "private": true,
+  "scripts": {
+    "dev": "bash scripts/dev.sh",
+    "download-livekit": "bash scripts/download-livekit.sh"
+  }
+}

@@ -1,0 +1,40 @@
+# LiveKit + token/UI next to an existing app on the same machine.
+#
+# Does not bind 80 or 443. Point a subdomain at the token/UI (3080)
+# and proxy LiveKit signaling (7880) — see nginx.example.conf.
+#
+# Required UDP on the host firewall: 7882/udp (media), 3478/udp (TURN).
+# Required TCP: 7880 (signaling, can stay internal), 7881 (ICE/TCP fallback).
+
+name: line
+
+services:
+  livekit:
+    image: livekit/livekit-server:v1.13.6
+    restart: unless-stopped
+    command: --config /etc/livekit.yaml --keys "${LIVEKIT_API_KEY}:${LIVEKIT_API_SECRET}"
+    volumes:
+      - ./livekit.yaml:/etc/livekit.yaml:ro
+    ports:
+      - "7880:7880"
+      - "7881:7881"
+      - "7882:7882/udp"
+      - "3478:3478/udp"
+
+  app:
+    build:
+      context: ..
+      dockerfile: apps/api/Dockerfile
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      APP_PORT: ${APP_PORT:-3080}
+      LIVEKIT_API_KEY: ${LIVEKIT_API_KEY}
+      LIVEKIT_API_SECRET: ${LIVEKIT_API_SECRET}
+      LIVEKIT_URL: ${LIVEKIT_URL}
+    ports:
+      - "${APP_PORT:-3080}:3080"
+    depends_on:
+      - livekit
+

@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Line — голосовой канал</title>
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Instrument+Serif:ital@0;1&display=swap"
+      rel="stylesheet"
+    />
+  </head>
+  <body>
+    <div class="frame">
+      <header class="mast">
+        <div class="brand">
+          <span class="brand-mark" aria-hidden="true"></span>
+          <h1>Line</h1>
+        </div>
+        <p id="status" class="status" data-state="idle">канал свободен</p>
+      </header>
+
+      <main>
+        <form id="join-form" class="panel" autocomplete="off">
+          <label>
+            Ваше имя
+            <input id="identity" name="identity" maxlength="32" required placeholder="Анна" />
+          </label>
+          <label>
+            Код комнаты
+            <input id="room" name="room" maxlength="32" required placeholder="desk-4" />
+          </label>
+          <p class="hint">Два человека с одним кодом попадают в один канал. Аудио, без видео.</p>
+          <button type="submit" class="btn primary">Подключиться</button>
+        </form>
+
+        <section id="call" class="call hidden">
+          <div class="call-meta">
+            <p>комната <strong id="room-label"></strong></p>
+            <p id="you-label"></p>
+          </div>
+          <ul id="roster" class="roster"></ul>
+          <div class="actions">
+            <button type="button" id="mute" class="btn">Микрофон вкл</button>
+            <button type="button" id="hangup" class="btn danger">Положить трубку</button>
+          </div>
+        </section>
+
+        <p id="error" class="error hidden" role="alert"></p>
+      </main>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

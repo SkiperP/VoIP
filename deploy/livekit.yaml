@@ -1,0 +1,22 @@
+# Production-oriented config for a VPS that already runs another app.
+# Does NOT bind 80/443 — hook a subdomain through the existing reverse proxy.
+#
+# UDP mux on a single port instead of 50000–60000: fewer firewall holes
+# and less chance of colliding with whatever is already on the box.
+
+port: 7880
+log_level: info
+
+rtc:
+  tcp_port: 7881
+  udp_port: 7882
+  use_external_ip: true
+
+# Keys are injected at runtime via --keys (see docker-compose.yml).
+# Placeholder so the file is valid if started by hand.
+keys:
+  devkey: thisisnotsecretthisisnotsecret1234
+
+turn:
+  enabled: true
+  udp_port: 3478
