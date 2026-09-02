@@ -256,22 +256,18 @@ Kamailio/OpenSIPS (signaling) + RTPEngine + Asterisk/FreeSWITCH (IVR, очере
 
 ## 7. Предлагаемый стек для этого репозитория
 
-Репозиторий пустой — стек ещё не зафиксирован. Два честных варианта:
+Репозиторий идёт по варианту 1: self-hosted LiveKit, свой UI «Line», token API. Встроенный TURN LiveKit на 3478, медиа через UDP mux 7882 (не диапазон 50000–60000 — так проще ужиться с другим приложением на той же машине).
 
-**Вариант 1 — не изобретать медиаслой (предпочтительный, если нет причины писать свой протокол):** LiveKit self-hosted + свой UI/аккаунты + coturn. Signaling, SFU, SDK клиентов и SIP-мост уже есть.
+| Слой | Сейчас |
+|---|---|
+| Клиент | `apps/web` — LiveKit JS SDK, только аудио |
+| Token API | `apps/api` — JWT `roomJoin` + раздача UI |
+| Signaling / медиа | LiveKit server (`deploy/livekit.yaml`) |
+| NAT | встроенный TURN LiveKit |
+| Auth приложения | пока открытый token endpoint (для демо) |
+| Соседство на VPS | `deploy/COEXIST.md` |
 
-**Вариант 2 — минимальный свой 1:1:** Web + WebSocket signaling + P2P WebRTC + coturn. Имеет смысл только если нужен полный контроль протокола и группы/запись точно не появятся.
-
-| Слой | LiveKit-путь | Свой 1:1 |
-|---|---|---|
-| Клиент MVP | LiveKit JS SDK | свой TypeScript + `RTCPeerConnection` |
-| Signaling | LiveKit server | свой WebSocket |
-| Медиа | SFU LiveKit | P2P WebRTC |
-| NAT | встроенный TURN / coturn | coturn |
-| Auth | JWT LiveKit + свои пользователи | свой JWT |
-| Группы / запись / SIP | из коробки | потом менять архитектуру |
-
-Писать Asterisk/Kamailio с нуля или форкать их «чтобы был свой VoIP» — плохая идея. Их поднимают, когда появляется АТС или PSTN, а не как первый коммит.
+Пользователей существующего приложения подключать сюда следующим шагом: token API должен проверять их сессию и только потом подписывать LiveKit JWT.
 
 ---
 
@@ -310,27 +306,19 @@ idle → calling → ringing → in_call → ended
 
 Пока эти пункты не закрыты, impl-план будет гадать. Для старта разумный дефолт:
 
-> In-app 1:1/группы через LiveKit + свой UI. Без своей АТС, без PSTN, без написания RTP.
+> In-app аудио через LiveKit + свой UI (этот репозиторий). Без своей АТС, без PSTN, без написания RTP.
+
+Статус реализации: скелет в `apps/` (UI + token API) и `deploy/` (LiveKit рядом с существующим приложением). Соседство с чужим процессом на VPS — [deploy/COEXIST.md](./deploy/COEXIST.md).
 
 ---
 
-## 11. Порядок работ после согласования дефолта
+## 11. Порядок работ
 
-Если выбран LiveKit:
+Сделано в репозитории: LiveKit-конфиг без 80/443, token API, web UI (join / mute / hangup), инструкция по соседству с другим приложением.
 
-1. Поднять LiveKit + coturn локально.
-2. Свой auth → LiveKit JWT.
-3. Web-клиент на официальном SDK: join / mute / hangup.
-4. Прогон NAT-сценариев.
-5. Потом: мобильные SDK, presence, история, SIP/PSTN при необходимости.
+Дальше:
 
-Если выбран свой 1:1:
-
-1. Спека signaling-сообщений (`invite` / `offer` / `answer` / `ice` / `hangup`) и state machine.
-2. Каркас auth + WebSocket-сервер.
-3. Web-клиент с `RTCPeerConnection`.
-4. coturn в окружении разработки.
-5. Прогон NAT-сценариев и метрики ICE.
-6. Только потом: второй клиент (mobile), presence, история, SFU/PSTN.
-
-Этот документ — карта, не имплементация. Код имеет смысл начинать, когда дефолт из раздела 10 подтверждён.
+1. Прогнать две вкладки локально (`bash scripts/dev.sh`).
+2. На VPS — checklist из `deploy/COEXIST.md` (порты, nginx, поддомены).
+3. Закрыть token endpoint авторизацией существующего приложения.
+4. Мобильные SDK, входящие, SIP/PSTN — только если понадобятся.

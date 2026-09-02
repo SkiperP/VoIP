@@ -1,0 +1,13 @@
+{
+  "name": "line-api",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js",
+    "test": "node --test src/index.test.js"
+  },
+  "dependencies": {
+    "livekit-server-sdk": "^2.14.0"
+  }
+}
