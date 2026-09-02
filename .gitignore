@@ -6,3 +6,5 @@ bin/
 .DS_Store
 apps/web/dist/
 apps/api/public/
+apps/web/.vite/
+

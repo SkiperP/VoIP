@@ -12,7 +12,9 @@
          └──WSS──► LiveKit :7880  ──UDP 7882──► медиа
 ```
 
-LiveKit не заменяет текущее приложение на сервере. Он садится рядом: nginx отдаёт поддомен, UDP для медиа открывается отдельно.
+LiveKit не заменяет текущее приложение на сервере. Он садится **отдельным compose** рядом: существующий Caddy получает два новых `server_name`, UDP для медиа открывается в firewall руками.
+
+Пока нет своего DNS — `*.sslip.io`. Итог по соседству: [deploy/COEXIST.md](./deploy/COEXIST.md).
 
 ## Локально
 
@@ -31,4 +33,4 @@ bash scripts/dev.sh
 
 ## На сервере рядом с другим приложением
 
-Не ставить официальный инсталлятор LiveKit с Caddy на 80/443 — он отберёт порты. Использовать `deploy/docker-compose.yml` и `deploy/nginx.example.conf`. Подробности в [deploy/COEXIST.md](./deploy/COEXIST.md).
+Не ставить официальный инсталлятор LiveKit с Caddy на 80/443 — он отберёт порты. Использовать `deploy/docker-compose.yml` и дописать сайты из `deploy/Caddyfile.example` в уже живой Caddy. Firewall UDP — руками. Подробности в [deploy/COEXIST.md](./deploy/COEXIST.md).
