@@ -12,9 +12,9 @@
          └──WSS──► LiveKit :7880  ──UDP 7882──► медиа
 ```
 
-LiveKit не заменяет текущее приложение на сервере. Он садится **отдельным compose** рядом: существующий Caddy получает два новых `server_name`, UDP для медиа открывается в firewall руками.
+LiveKit не заменяет текущее приложение на сервере. Он садится **отдельным compose** рядом: в Caddy на `badger-budget.ru` добавляются `call.` и `livekit.`, UDP для медиа открывается в firewall руками.
 
-Пока нет своего DNS — `*.sslip.io`. Итог по соседству: [deploy/COEXIST.md](./deploy/COEXIST.md).
+Итог и команды: [deploy/COEXIST.md](./deploy/COEXIST.md).
 
 ## Локально
 
