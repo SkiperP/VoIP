@@ -7,4 +7,6 @@ bin/
 apps/web/dist/
 apps/api/public/
 apps/web/.vite/
+deploy/runtime/*
+!deploy/runtime/.gitkeep
 

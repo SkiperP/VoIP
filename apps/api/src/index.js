@@ -3,6 +3,11 @@ import { readFile } from "node:fs/promises";
 import { extname, join, normalize } from "node:path";
 import { fileURLToPath } from "node:url";
 import { AccessToken } from "livekit-server-sdk";
+import {
+  canonicalPath,
+  livekitUrlFor,
+  readHttpsPublicUrl,
+} from "./public-url.js";
 
 const ROOT = fileURLToPath(new URL("..", import.meta.url));
 const PUBLIC_DIR = join(ROOT, "public");
@@ -69,9 +74,8 @@ async function issueToken(identity, room) {
   return at.toJwt();
 }
 
-async function serveStatic(req, res) {
-  const url = new URL(req.url ?? "/", "http://local");
-  let relative = decodeURIComponent(url.pathname);
+async function serveStatic(req, res, pathname) {
+  let relative = decodeURIComponent(pathname);
   if (relative === "/") relative = "/index.html";
   const target = normalize(join(PUBLIC_DIR, relative));
   if (!target.startsWith(PUBLIC_DIR)) {
@@ -103,6 +107,7 @@ async function serveStatic(req, res) {
 
 const server = createServer(async (req, res) => {
   const url = new URL(req.url ?? "/", "http://local");
+  const path = canonicalPath(url.pathname);
 
   applyCommonHeaders(res);
 
@@ -113,12 +118,19 @@ const server = createServer(async (req, res) => {
   }
 
   try {
-    if (req.method === "GET" && url.pathname === "/api/health") {
-      json(res, 200, { ok: true, livekitUrl: LIVEKIT_URL });
+    if (
+      (req.method === "GET" || req.method === "HEAD") &&
+      path === "/api/health"
+    ) {
+      json(res, 200, {
+        ok: true,
+        livekitUrl: livekitUrlFor(req),
+        httpsPublicUrl: readHttpsPublicUrl(),
+      });
       return;
     }
 
-    if (req.method === "POST" && url.pathname === "/api/token") {
+    if (req.method === "POST" && path === "/api/token") {
       const body = await readJson(req);
       const identity = String(body.identity ?? "").trim();
       const room = String(body.room ?? "").trim();
@@ -135,12 +147,17 @@ const server = createServer(async (req, res) => {
         return;
       }
       const token = await issueToken(identity, room);
-      json(res, 200, { token, url: LIVEKIT_URL, identity, room });
+      json(res, 200, {
+        token,
+        url: livekitUrlFor(req),
+        identity,
+        room,
+      });
       return;
     }
 
-    if (req.method === "GET") {
-      await serveStatic(req, res);
+    if (req.method === "GET" || req.method === "HEAD") {
+      await serveStatic(req, res, path);
       return;
     }
 

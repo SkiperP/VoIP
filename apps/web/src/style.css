@@ -208,6 +208,10 @@ input:focus {
   font-size: 14px;
 }
 
+.https-banner a {
+  color: var(--line);
+}
+
 .hidden {
   display: none !important;
 }
