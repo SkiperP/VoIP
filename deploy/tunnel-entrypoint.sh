@@ -7,8 +7,10 @@ URL_FILE="${HTTPS_URL_FILE:-/runtime/https-url}"
 mkdir -p "$(dirname "$URL_FILE")" /root/.ssh
 
 extract_url() {
-	# Prefer the *.link / *.net host printed by free Pinggy.
-	printf '%s\n' "$1" | sed -n 's/.*\(https:\/\/[a-zA-Z0-9.-]*pinggy[a-zA-Z0-9.-]*\).*/\1/p' | head -n 1
+	printf '%s\n' "$1" | sed -n \
+		-e 's/.*\(https:\/\/[a-zA-Z0-9-]*\.free\.pinggy\.net\).*/\1/p' \
+		-e 's/.*\(https:\/\/[a-zA-Z0-9-]*\.run\.pinggy-free\.link\).*/\1/p' \
+		| head -n 1
 }
 
 echo "line-tunnel: ssh -p 443 a.pinggy.io -> ${ORIGIN_HOST}:${ORIGIN_PORT}" >&2

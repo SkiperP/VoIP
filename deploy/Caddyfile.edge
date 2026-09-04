@@ -15,11 +15,14 @@
 	handle /lk/* {
 		uri strip_prefix /lk
 		reverse_proxy livekit:7880 {
+			header_up X-Forwarded-Proto https
 			flush_interval -1
 		}
 	}
 
 	handle {
-		reverse_proxy app:3080
+		reverse_proxy app:3080 {
+			header_up X-Forwarded-Proto https
+		}
 	}
 }

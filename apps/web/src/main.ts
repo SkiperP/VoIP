@@ -45,6 +45,18 @@ function apiUrl(path: string): string {
   return new URL(rel, `${window.location.origin}${base}`).toString();
 }
 
+function signalingUrl(fromApi: string): string {
+  try {
+    const parsed = new URL(fromApi);
+    if (window.location.protocol === "https:" && parsed.protocol === "ws:") {
+      parsed.protocol = "wss:";
+    }
+    return parsed.toString().replace(/\/$/, "");
+  } catch {
+    return fromApi;
+  }
+}
+
 function setStatus(state: "idle" | "live" | "error", text: string) {
   statusEl.dataset.state = state;
   statusEl.textContent = text;
@@ -268,7 +280,7 @@ async function connect(identity: string, roomName: string) {
   next.on(RoomEvent.Reconnecting, () => setStatus("idle", "переподключение…"));
   next.on(RoomEvent.Reconnected, () => setStatus("live", "на линии"));
 
-  await next.connect(session.url, session.token);
+  await next.connect(signalingUrl(session.url), session.token);
   try {
     await publishMicrophone(next);
   } catch (err) {
