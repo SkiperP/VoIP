@@ -72,21 +72,19 @@ function showError(message: string | null) {
   errorEl.classList.remove("hidden");
 }
 
-function httpsJoinUrl(): string | null {
-  if (!httpsPublicUrl) return null;
-  try {
-    return new URL("call/", `${httpsPublicUrl}/`).toString();
-  } catch {
-    return httpsPublicUrl;
+function httpsJoinUrl(): string {
+  if (httpsPublicUrl) {
+    try {
+      return new URL("call/", `${httpsPublicUrl}/`).toString();
+    } catch {
+      return httpsPublicUrl;
+    }
   }
+  return "https://badger-budget.ru/call/";
 }
 
 function insecureMicMessage(): string {
-  const href = httpsJoinUrl();
-  if (href) {
-    return `Микрофон доступен только по HTTPS. Откройте ${href}`;
-  }
-  return "Микрофон доступен только по HTTPS. Страница по https://call.badger-budget.ru с этой сети не открывается — нужна ссылка туннеля из /api/health.";
+  return `Микрофон доступен только по HTTPS. Откройте ${httpsJoinUrl()}`;
 }
 
 function micDeniedMessage(err: unknown): string {
@@ -126,14 +124,10 @@ function showHttpsBanner() {
   httpsBanner.classList.remove("hidden");
   httpsBanner.replaceChildren();
   httpsBanner.append("Для микрофона откройте ");
-  if (href) {
-    const a = document.createElement("a");
-    a.href = href;
-    a.textContent = href;
-    httpsBanner.append(a);
-  } else {
-    httpsBanner.append("HTTPS-ссылку туннеля (ещё поднимается, обновите страницу).");
-  }
+  const a = document.createElement("a");
+  a.href = href;
+  a.textContent = href;
+  httpsBanner.append(a);
 }
 
 async function requestMicrophone(): Promise<MediaStream> {

@@ -1,15 +1,22 @@
-# HTTPS on this VPS IP hangs from the public internet: TCP 443 connects,
-# then the TLS Client Hello never arrives (HTTP on :80 and even plaintext
-# on :443 work). Serve Line through the Cloudflare quick tunnel in
-# docker-compose.yml, and keep these handles on the existing Caddy so
-# HTTP paths still route.
+# Existing Caddy on the VPS. Do not bind a second Caddy to 80/443.
 #
-#   https://<pinggy>/call/              ← working HTTPS (see /api/health)
-#   http://call.badger-budget.ru        ← page only; microphone needs HTTPS
-#   wss://<same-host>/lk                ← signaling (derived from the request)
+# AdminVPS / TSPU in Russian networks drop some TLS 1.3 ClientHellos.
+# HTTPS sites must pin TLS 1.2 (see the (https) snippet).
 #
-# Put these handles at the TOP of the existing (routes) snippet,
+#   https://badger-budget.ru/call/
+#   wss://badger-budget.ru/lk
+#
+# Put /call and /lk handles at the TOP of the existing (routes) snippet,
 # before the catch-all reverse_proxy to panel.
+#
+# A bare `redir` is compiled BEFORE `handle`. Wrap HTTPS catch-all:
+#   handle { redir https://{host}{uri} 308 }
+
+(tls12) {
+	tls {
+		protocols tls1.2 tls1.2
+	}
+}
 
 # handle /call {
 # 	redir * /call/ 302
@@ -29,43 +36,8 @@
 # 	}
 # }
 
-# Critical: a bare `redir` is compiled BEFORE `handle` (Caddy directive
-# order), so wrap the HTTPS catch-all in `handle { }` or /call never matches.
-#
-# http://badger-budget.ru, http://www.badger-budget.ru {
-# 	handle /call* { ... }
-# 	handle /lk { redir * /lk/ 302 }
-# 	handle /lk/* { ... }
-# 	handle {
-# 		redir https://{host}{uri} 308
-# 	}
-# }
-
-# Optional extra hostnames (HTTP works; HTTPS on these names hangs):
-
-http://call.badger-budget.ru {
-	header Permissions-Policy "microphone=(self), camera=()"
-	handle /lk {
-		redir * /lk/ 302
-	}
-	handle /lk/* {
-		uri strip_prefix /lk
-		reverse_proxy host.docker.internal:7880 {
-			flush_interval -1
-		}
-	}
-	handle {
-		reverse_proxy host.docker.internal:3080
-	}
-}
-
-http://livekit.badger-budget.ru {
-	reverse_proxy host.docker.internal:7880 {
-		flush_interval -1
-	}
-}
-
 call.badger-budget.ru {
+	import tls12
 	header Permissions-Policy "microphone=(self), camera=()"
 	handle /lk {
 		redir * /lk/ 302
@@ -82,6 +54,7 @@ call.badger-budget.ru {
 }
 
 livekit.badger-budget.ru {
+	import tls12
 	reverse_proxy host.docker.internal:7880 {
 		flush_interval -1
 	}
