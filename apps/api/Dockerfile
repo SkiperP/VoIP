@@ -1,5 +1,7 @@
 FROM node:22-alpine AS web
 WORKDIR /web
+ARG VITE_BASE=/
+ENV VITE_BASE=$VITE_BASE
 COPY apps/web/package.json apps/web/package-lock.json ./
 RUN npm ci
 COPY apps/web ./

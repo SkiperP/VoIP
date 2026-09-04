@@ -31,6 +31,12 @@ const roomInput = document.querySelector<HTMLInputElement>("#room")!;
 let room: Room | null = null;
 let micEnabled = false;
 
+function apiUrl(path: string): string {
+  const base = import.meta.env.BASE_URL || "/";
+  const rel = path.startsWith("/") ? path.slice(1) : path;
+  return new URL(rel, `${window.location.origin}${base}`).toString();
+}
+
 function setStatus(state: "idle" | "live" | "error", text: string) {
   statusEl.dataset.state = state;
   statusEl.textContent = text;
@@ -75,7 +81,7 @@ async function unlockAudio(): Promise<void> {
 async function requestMicrophone(): Promise<MediaStream> {
   if (!window.isSecureContext) {
     throw new Error(
-      "Микрофон доступен только по HTTPS. Откройте https://call.badger-budget.ru",
+      "Микрофон доступен только по HTTPS. Откройте https://badger-budget.ru/call/",
     );
   }
   if (!navigator.mediaDevices?.getUserMedia) {
@@ -161,7 +167,7 @@ async function fetchToken(
   identity: string,
   roomName: string,
 ): Promise<TokenResponse> {
-  const res = await fetch("/api/token", {
+  const res = await fetch(apiUrl("api/token"), {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ identity, room: roomName }),
@@ -303,7 +309,7 @@ window.addEventListener("beforeunload", () => {
 
 void (async () => {
   try {
-    const res = await fetch("/api/health");
+    const res = await fetch(apiUrl("api/health"));
     if (!res.ok) throw new Error("api down");
   } catch {
     showError("Token API недоступен. Запустите apps/api и LiveKit.");
