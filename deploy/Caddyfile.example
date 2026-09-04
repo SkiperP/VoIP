@@ -4,9 +4,9 @@
 # docker-compose.yml, and keep these handles on the existing Caddy so
 # HTTP paths still route.
 #
-#   https://<trycloudflare>/call/     ← working HTTPS (see /api/health)
-#   http://call.badger-budget.ru      ← page only; microphone needs HTTPS
-#   wss://<same-host>/lk              ← signaling (derived from the request)
+#   https://<pinggy>/call/              ← working HTTPS (see /api/health)
+#   http://call.badger-budget.ru        ← page only; microphone needs HTTPS
+#   wss://<same-host>/lk                ← signaling (derived from the request)
 #
 # Put these handles at the TOP of the existing (routes) snippet,
 # before the catch-all reverse_proxy to panel.

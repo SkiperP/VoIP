@@ -12,7 +12,7 @@
          └──WSS──► LiveKit :7880  ──UDP 7882──► медиа
 ```
 
-LiveKit не заменяет текущее приложение на сервере. Он садится **отдельным compose** рядом. На VPS `157.22.252.10` TLS с интернета зависает (Client Hello не доходит), поэтому рабочий HTTPS — Cloudflare quick tunnel (`https://*.trycloudflare.com/call/`). HTTP `http://call.badger-budget.ru` открывает страницу, но микрофон в браузере без HTTPS не включится.
+LiveKit не заменяет текущее приложение на сервере. Он садится **отдельным compose** рядом. На VPS `157.22.252.10` TLS с интернета зависает (Client Hello не доходит), поэтому рабочий HTTPS — Pinggy-туннель по исходящему SSH/443 (`https://*.pinggy.*/call/`). HTTP `http://call.badger-budget.ru` открывает страницу, но микрофон в браузере без HTTPS не включится.
 
 Итог и команды: [deploy/COEXIST.md](./deploy/COEXIST.md).
 

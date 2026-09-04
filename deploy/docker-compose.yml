@@ -7,8 +7,8 @@
 #   TCP 7881, UDP 7882 (media mux), UDP 3478 (TURN).
 #
 # Public HTTPS to this IP is dropped on the path (TLS Client Hello never
-# arrives). The `tunnel` service publishes a working https://*.trycloudflare.com
-# URL; the UI reads it from /api/health.
+# arrives). The `tunnel` service opens an SSH reverse tunnel to Pinggy
+# (outbound TCP 443) and writes https://*.pinggy.* to runtime/https-url.
 
 name: line
 
@@ -66,7 +66,8 @@ services:
       dockerfile: Dockerfile.tunnel
     restart: unless-stopped
     environment:
-      TUNNEL_ORIGIN: http://edge:80
+      TUNNEL_ORIGIN_HOST: edge
+      TUNNEL_ORIGIN_PORT: "80"
       HTTPS_URL_FILE: /runtime/https-url
     volumes:
       - ./runtime:/runtime

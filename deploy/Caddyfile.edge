@@ -3,8 +3,7 @@
 	auto_https off
 }
 
-# Internal HTTP edge for the Cloudflare quick tunnel.
-# The public hostname is *.trycloudflare.com (HTTPS there, HTTP here).
+# Internal HTTP edge for the public HTTPS tunnel (Pinggy over SSH/443).
 
 :80 {
 	header Permissions-Policy "microphone=(self), camera=()"
