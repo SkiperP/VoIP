@@ -12,7 +12,7 @@ extract_url() {
 
 echo "line-tunnel: opening quick tunnel to ${ORIGIN}" >&2
 
-cloudflared tunnel --no-autoupdate --url "$ORIGIN" 2>&1 | while IFS= read -r line; do
+cloudflared tunnel --no-autoupdate --protocol http2 --url "$ORIGIN" 2>&1 | while IFS= read -r line; do
 	printf '%s\n' "$line"
 	url=$(extract_url "$line")
 	if [ -n "$url" ]; then

@@ -13,6 +13,7 @@ rtc:
   use_external_ip: true
 
 # Keys are injected at runtime via --keys (see docker-compose.yml).
+# LiveKit requires a space after the colon: "key: secret".
 # Placeholder so the file is valid if started by hand.
 keys:
   devkey: thisisnotsecretthisisnotsecret1234
