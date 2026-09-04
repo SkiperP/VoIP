@@ -29,7 +29,7 @@ const identityInput = document.querySelector<HTMLInputElement>("#identity")!;
 const roomInput = document.querySelector<HTMLInputElement>("#room")!;
 
 let room: Room | null = null;
-let micEnabled = true;
+let micEnabled = false;
 
 function setStatus(state: "idle" | "live" | "error", text: string) {
   statusEl.dataset.state = state;
@@ -46,13 +46,66 @@ function showError(message: string | null) {
   errorEl.classList.remove("hidden");
 }
 
+function micDeniedMessage(err: unknown): string {
+  const name = err instanceof DOMException ? err.name : "";
+  if (name === "NotAllowedError" || name === "PermissionDeniedError") {
+    return "Браузер заблокировал микрофон. Нажмите на иконку замка в адресной строке и разрешите микрофон, затем попробуйте снова.";
+  }
+  if (name === "NotFoundError") {
+    return "Микрофон не найден. Подключите устройство и разрешите доступ.";
+  }
+  if (name === "NotReadableError") {
+    return "Микрофон занят другим приложением.";
+  }
+  if (err instanceof Error && err.message) return err.message;
+  return "Не удалось получить доступ к микрофону.";
+}
+
+async function unlockAudio(): Promise<void> {
+  const Ctor =
+    window.AudioContext ||
+    (window as unknown as { webkitAudioContext?: typeof AudioContext })
+      .webkitAudioContext;
+  if (!Ctor) return;
+  const ctx = new Ctor();
+  if (ctx.state === "suspended") await ctx.resume();
+  await ctx.close();
+}
+
+async function requestMicrophone(): Promise<MediaStream> {
+  if (!window.isSecureContext) {
+    throw new Error(
+      "Микрофон доступен только по HTTPS. Откройте https://call.badger-budget.ru",
+    );
+  }
+  if (!navigator.mediaDevices?.getUserMedia) {
+    throw new Error("Этот браузер не умеет работать с микрофоном.");
+  }
+  return navigator.mediaDevices.getUserMedia({
+    audio: {
+      echoCancellation: true,
+      noiseSuppression: true,
+      autoGainControl: true,
+    },
+    video: false,
+  });
+}
+
+function syncMuteButton() {
+  muteBtn.setAttribute("aria-pressed", micEnabled ? "false" : "true");
+  muteBtn.classList.toggle("muted", !micEnabled);
+  muteBtn.textContent = micEnabled
+    ? "Выключить микрофон"
+    : "Включить микрофон";
+}
+
 function tagFor(participant: Participant): string {
   if (participant.isSpeaking) return "говорит";
   if (participant === room?.localParticipant) {
     return micEnabled ? "микрофон" : "без звука";
   }
   const mic = participant.getTrackPublication(Track.Source.Microphone);
-  if (mic?.isMuted) return "без звука";
+  if (!mic || mic.isMuted) return "без звука";
   return "на линии";
 }
 
@@ -85,18 +138,29 @@ function attachAudio(track: RemoteTrack, participant: RemoteParticipant) {
   const el = track.attach();
   el.dataset.identity = participant.identity;
   el.autoplay = true;
+  el.setAttribute("playsinline", "");
   document.body.append(el);
+  void el.play().catch(() => {
+    /* autoplay may wait until the next user gesture */
+  });
 }
 
 function detachAudio(identity: string) {
+  const safe =
+    typeof CSS !== "undefined" && typeof CSS.escape === "function"
+      ? CSS.escape(identity)
+      : identity.replace(/"/g, "");
   document
-    .querySelectorAll<HTMLMediaElement>(`audio[data-identity="${identity}"]`)
+    .querySelectorAll<HTMLMediaElement>(`audio[data-identity="${safe}"]`)
     .forEach((el) => {
       el.remove();
     });
 }
 
-async function fetchToken(identity: string, roomName: string): Promise<TokenResponse> {
+async function fetchToken(
+  identity: string,
+  roomName: string,
+): Promise<TokenResponse> {
   const res = await fetch("/api/token", {
     method: "POST",
     headers: { "content-type": "application/json" },
@@ -107,8 +171,25 @@ async function fetchToken(identity: string, roomName: string): Promise<TokenResp
   return data;
 }
 
+async function publishMicrophone(next: Room): Promise<void> {
+  const publication = await next.localParticipant.setMicrophoneEnabled(true, {
+    echoCancellation: true,
+    noiseSuppression: true,
+    autoGainControl: true,
+  });
+  micEnabled = Boolean(publication) && !publication.isMuted;
+  if (!micEnabled) {
+    throw new Error("Микрофон не опубликован. Проверьте разрешение браузера.");
+  }
+}
+
 async function connect(identity: string, roomName: string) {
   showError(null);
+  setStatus("idle", "запрос микрофона…");
+  await unlockAudio();
+  const preview = await requestMicrophone();
+  preview.getTracks().forEach((track) => track.stop());
+
   setStatus("idle", "соединение…");
   const session = await fetchToken(identity, roomName);
   const next = new Room({
@@ -127,6 +208,9 @@ async function connect(identity: string, roomName: string) {
     renderRoster();
   });
   next.on(RoomEvent.ActiveSpeakersChanged, renderRoster);
+  next.on(RoomEvent.LocalTrackPublished, renderRoster);
+  next.on(RoomEvent.TrackMuted, renderRoster);
+  next.on(RoomEvent.TrackUnmuted, renderRoster);
   next.on(RoomEvent.Disconnected, () => {
     cleanupUi();
     setStatus("idle", "канал свободен");
@@ -136,18 +220,17 @@ async function connect(identity: string, roomName: string) {
 
   await next.connect(session.url, session.token);
   try {
-    await next.localParticipant.setMicrophoneEnabled(true);
-    micEnabled = true;
+    await publishMicrophone(next);
   } catch (err) {
     micEnabled = false;
     console.warn(err);
-    showError("Микрофон недоступен — вы на линии без публикации звука.");
+    showError(micDeniedMessage(err));
   }
   room = next;
 
   roomLabel.textContent = session.room;
   youLabel.textContent = session.identity;
-  muteBtn.textContent = micEnabled ? "Микрофон вкл" : "Микрофон выкл";
+  syncMuteButton();
   form.classList.add("hidden");
   callEl.classList.remove("hidden");
   setStatus("live", "на линии");
@@ -157,6 +240,8 @@ async function connect(identity: string, roomName: string) {
 function cleanupUi() {
   document.querySelectorAll("audio[data-identity]").forEach((el) => el.remove());
   room = null;
+  micEnabled = false;
+  syncMuteButton();
   form.classList.remove("hidden");
   callEl.classList.add("hidden");
   rosterEl.replaceChildren();
@@ -177,8 +262,7 @@ form.addEventListener("submit", async (event) => {
   try {
     await connect(identityInput.value.trim(), roomInput.value.trim());
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Не удалось подключиться";
-    showError(message);
+    showError(micDeniedMessage(err));
     setStatus("error", "сбой");
   } finally {
     submit.removeAttribute("disabled");
@@ -187,10 +271,26 @@ form.addEventListener("submit", async (event) => {
 
 muteBtn.addEventListener("click", async () => {
   if (!room) return;
-  micEnabled = !micEnabled;
-  await room.localParticipant.setMicrophoneEnabled(micEnabled);
-  muteBtn.textContent = micEnabled ? "Микрофон вкл" : "Микрофон выкл";
-  renderRoster();
+  muteBtn.disabled = true;
+  try {
+    if (micEnabled) {
+      await room.localParticipant.setMicrophoneEnabled(false);
+      micEnabled = false;
+    } else {
+      await unlockAudio();
+      const preview = await requestMicrophone();
+      preview.getTracks().forEach((track) => track.stop());
+      await publishMicrophone(room);
+    }
+    showError(null);
+  } catch (err) {
+    micEnabled = false;
+    showError(micDeniedMessage(err));
+  } finally {
+    syncMuteButton();
+    renderRoster();
+    muteBtn.disabled = false;
+  }
 });
 
 hangupBtn.addEventListener("click", () => {

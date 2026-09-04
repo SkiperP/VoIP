@@ -26,8 +26,19 @@ const MIME = {
 const NAME_RE = /^[\p{L}\p{N} ._-]{2,32}$/u;
 const ROOM_RE = /^[A-Za-z0-9_-]{3,32}$/;
 
+function applyCommonHeaders(res) {
+  res.setHeader("access-control-allow-origin", "*");
+  res.setHeader("access-control-allow-headers", "content-type");
+  res.setHeader("access-control-allow-methods", "GET,POST,OPTIONS");
+  res.setHeader(
+    "permissions-policy",
+    "microphone=(self), camera=(), display-capture=()",
+  );
+}
+
 function json(res, status, body) {
   const payload = JSON.stringify(body);
+  applyCommonHeaders(res);
   res.writeHead(status, {
     "content-type": "application/json; charset=utf-8",
     "cache-control": "no-store",
@@ -69,6 +80,7 @@ async function serveStatic(req, res) {
   }
   try {
     const data = await readFile(target);
+    applyCommonHeaders(res);
     res.writeHead(200, {
       "content-type": MIME[extname(target)] ?? "application/octet-stream",
     });
@@ -79,6 +91,7 @@ async function serveStatic(req, res) {
         () => null,
       );
       if (fallback) {
+        applyCommonHeaders(res);
         res.writeHead(200, { "content-type": MIME[".html"] });
         res.end(fallback);
         return;
@@ -91,9 +104,7 @@ async function serveStatic(req, res) {
 const server = createServer(async (req, res) => {
   const url = new URL(req.url ?? "/", "http://local");
 
-  res.setHeader("access-control-allow-origin", "*");
-  res.setHeader("access-control-allow-headers", "content-type");
-  res.setHeader("access-control-allow-methods", "GET,POST,OPTIONS");
+  applyCommonHeaders(res);
 
   if (req.method === "OPTIONS") {
     res.writeHead(204);

@@ -1,13 +1,12 @@
-# Add these two site blocks to the EXISTING Caddyfile.
-# Do not start a second Caddy and do not replace the current app's site.
-#
-# Replace 203.0.113.10 with the VPS public IPv4.
+# Add these two site blocks to the EXISTING Caddyfile on the VPS.
+# Do not start a second Caddy. Do not replace the badger-budget.ru site.
 
-call.203.0.113.10.sslip.io {
+call.badger-budget.ru {
+	header Permissions-Policy "microphone=(self), camera=()"
 	reverse_proxy 127.0.0.1:3080
 }
 
-livekit.203.0.113.10.sslip.io {
+livekit.badger-budget.ru {
 	reverse_proxy 127.0.0.1:7880 {
 		header_up Host {host}
 		header_up X-Forwarded-Proto {scheme}

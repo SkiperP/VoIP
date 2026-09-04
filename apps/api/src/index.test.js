@@ -46,6 +46,11 @@ test("token API issues a jwt and rejects bad rooms", async (t) => {
 
   const health = await fetch(`${BASE}/api/health`).then((r) => r.json());
   assert.equal(health.ok, true);
+  const healthHeaders = await fetch(`${BASE}/api/health`);
+  assert.match(
+    healthHeaders.headers.get("permissions-policy") ?? "",
+    /microphone=\(self\)/,
+  );
 
   const bad = await fetch(`${BASE}/api/token`, {
     method: "POST",
