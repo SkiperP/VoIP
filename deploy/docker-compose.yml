@@ -3,8 +3,12 @@
 # Does not bind 80 or 443. Signaling/UI stay on loopback; the existing Caddy
 # adds two server_name blocks (see Caddyfile.example).
 #
-# Host firewall must allow (not yet open on the target VPS — do this by hand):
+# Host firewall must allow:
 #   TCP 7881, UDP 7882 (media mux), UDP 3478 (TURN).
+#
+# Public HTTPS to this IP is dropped on the path (TLS Client Hello never
+# arrives). The `tunnel` service publishes a working https://*.trycloudflare.com
+# URL; the UI reads it from /api/health.
 
 name: line
 
@@ -35,7 +39,32 @@ services:
       LIVEKIT_API_KEY: ${LIVEKIT_API_KEY}
       LIVEKIT_API_SECRET: ${LIVEKIT_API_SECRET}
       LIVEKIT_URL: ${LIVEKIT_URL}
+      HTTPS_URL_FILE: /app/runtime/https-url
+    volumes:
+      - ./runtime:/app/runtime:ro
     ports:
       - "127.0.0.1:${APP_PORT:-3080}:3080"
     depends_on:
       - livekit
+
+  edge:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    volumes:
+      - ./Caddyfile.edge:/etc/caddy/Caddyfile:ro
+    depends_on:
+      - app
+      - livekit
+
+  tunnel:
+    build:
+      context: .
+      dockerfile: Dockerfile.tunnel
+    restart: unless-stopped
+    environment:
+      TUNNEL_ORIGIN: http://edge:80
+      HTTPS_URL_FILE: /runtime/https-url
+    volumes:
+      - ./runtime:/runtime
+    depends_on:
+      - edge

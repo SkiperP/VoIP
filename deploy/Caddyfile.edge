@@ -1,0 +1,26 @@
+{
+	admin off
+	auto_https off
+}
+
+# Internal HTTP edge for the Cloudflare quick tunnel.
+# The public hostname is *.trycloudflare.com (HTTPS there, HTTP here).
+
+:80 {
+	header Permissions-Policy "microphone=(self), camera=()"
+
+	handle /lk {
+		redir * /lk/ 302
+	}
+
+	handle /lk/* {
+		uri strip_prefix /lk
+		reverse_proxy livekit:7880 {
+			flush_interval -1
+		}
+	}
+
+	handle {
+		reverse_proxy app:3080
+	}
+}

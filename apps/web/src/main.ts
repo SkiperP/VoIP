@@ -16,6 +16,12 @@ type TokenResponse = {
   error?: string;
 };
 
+type HealthResponse = {
+  ok?: boolean;
+  livekitUrl?: string;
+  httpsPublicUrl?: string | null;
+};
+
 const form = document.querySelector<HTMLFormElement>("#join-form")!;
 const callEl = document.querySelector<HTMLElement>("#call")!;
 const statusEl = document.querySelector<HTMLElement>("#status")!;
@@ -27,9 +33,11 @@ const muteBtn = document.querySelector<HTMLButtonElement>("#mute")!;
 const hangupBtn = document.querySelector<HTMLButtonElement>("#hangup")!;
 const identityInput = document.querySelector<HTMLInputElement>("#identity")!;
 const roomInput = document.querySelector<HTMLInputElement>("#room")!;
+const httpsBanner = document.querySelector<HTMLElement>("#https-banner");
 
 let room: Room | null = null;
 let micEnabled = false;
+let httpsPublicUrl: string | null = null;
 
 function apiUrl(path: string): string {
   const base = import.meta.env.BASE_URL || "/";
@@ -50,6 +58,23 @@ function showError(message: string | null) {
   }
   errorEl.textContent = message;
   errorEl.classList.remove("hidden");
+}
+
+function httpsJoinUrl(): string | null {
+  if (!httpsPublicUrl) return null;
+  try {
+    return new URL("call/", `${httpsPublicUrl}/`).toString();
+  } catch {
+    return httpsPublicUrl;
+  }
+}
+
+function insecureMicMessage(): string {
+  const href = httpsJoinUrl();
+  if (href) {
+    return `Микрофон доступен только по HTTPS. Откройте ${href}`;
+  }
+  return "Микрофон доступен только по HTTPS. Страница по https://call.badger-budget.ru с этой сети не открывается — нужна ссылка туннеля из /api/health.";
 }
 
 function micDeniedMessage(err: unknown): string {
@@ -78,11 +103,30 @@ async function unlockAudio(): Promise<void> {
   await ctx.close();
 }
 
+function showHttpsBanner() {
+  if (!httpsBanner) return;
+  if (window.isSecureContext) {
+    httpsBanner.classList.add("hidden");
+    httpsBanner.replaceChildren();
+    return;
+  }
+  const href = httpsJoinUrl();
+  httpsBanner.classList.remove("hidden");
+  httpsBanner.replaceChildren();
+  httpsBanner.append("Для микрофона откройте ");
+  if (href) {
+    const a = document.createElement("a");
+    a.href = href;
+    a.textContent = href;
+    httpsBanner.append(a);
+  } else {
+    httpsBanner.append("HTTPS-ссылку туннеля (ещё поднимается, обновите страницу).");
+  }
+}
+
 async function requestMicrophone(): Promise<MediaStream> {
   if (!window.isSecureContext) {
-    throw new Error(
-      "Микрофон доступен только по HTTPS. Откройте https://badger-budget.ru/call/",
-    );
+    throw new Error(insecureMicMessage());
   }
   if (!navigator.mediaDevices?.getUserMedia) {
     throw new Error("Этот браузер не умеет работать с микрофоном.");
@@ -311,8 +355,12 @@ void (async () => {
   try {
     const res = await fetch(apiUrl("api/health"));
     if (!res.ok) throw new Error("api down");
+    const health = (await res.json()) as HealthResponse;
+    httpsPublicUrl = health.httpsPublicUrl ?? null;
+    showHttpsBanner();
   } catch {
     showError("Token API недоступен. Запустите apps/api и LiveKit.");
     setStatus("error", "нет api");
+    showHttpsBanner();
   }
 })();
