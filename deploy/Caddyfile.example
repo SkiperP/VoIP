@@ -1,22 +1,13 @@
 # Add these two site blocks to the EXISTING Caddyfile on the VPS.
-<<<<<<< HEAD
 # Do not start a second Caddy. Do not replace the badger-budget.ru site
 # that already serves the current app.
 #
 # DNS (same A record as badger-budget.ru):
 #   call.badger-budget.ru      A
 #   livekit.badger-budget.ru   A
-#
-# Wait until both names resolve to this server, then reload Caddy.
-# Caddy will request Let's Encrypt certs on the existing :80/:443 listener.
-
-call.badger-budget.ru {
-=======
-# Do not start a second Caddy. Do not replace the badger-budget.ru site.
 
 call.badger-budget.ru {
 	header Permissions-Policy "microphone=(self), camera=()"
->>>>>>> origin/cursor/mic-permissions-mute-2a60
 	reverse_proxy 127.0.0.1:3080
 }
 
