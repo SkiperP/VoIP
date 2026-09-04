@@ -138,6 +138,11 @@ input:focus {
   color: #ffb2a3;
 }
 
+.btn.mute.muted {
+  border-color: var(--danger);
+  color: #ffb2a3;
+}
+
 .btn:disabled {
   opacity: 0.55;
   cursor: wait;

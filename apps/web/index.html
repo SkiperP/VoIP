@@ -26,13 +26,13 @@
         <form id="join-form" class="panel" autocomplete="off">
           <label>
             Ваше имя
-            <input id="identity" name="identity" maxlength="32" required placeholder="Анна" />
+            <input id="identity" name="identity" maxlength="32" required autocomplete="nickname" />
           </label>
           <label>
             Код комнаты
-            <input id="room" name="room" maxlength="32" required placeholder="desk-4" />
+            <input id="room" name="room" maxlength="32" required autocomplete="off" />
           </label>
-          <p class="hint">Два человека с одним кодом попадают в один канал. Аудио, без видео.</p>
+          <p class="hint">Браузер запросит доступ к микрофону. Два человека с одним кодом попадают в один канал.</p>
           <button type="submit" class="btn primary">Подключиться</button>
         </form>
 
@@ -43,7 +43,9 @@
           </div>
           <ul id="roster" class="roster"></ul>
           <div class="actions">
-            <button type="button" id="mute" class="btn">Микрофон вкл</button>
+            <button type="button" id="mute" class="btn mute muted" aria-pressed="true">
+              Включить микрофон
+            </button>
             <button type="button" id="hangup" class="btn danger">Положить трубку</button>
           </div>
         </section>
