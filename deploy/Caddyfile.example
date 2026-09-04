@@ -1,20 +1,37 @@
-# Add these two site blocks to the EXISTING Caddyfile on the VPS.
-# Do not start a second Caddy. Do not replace the badger-budget.ru site
-# that already serves the current app.
+# HTTPS on call.badger-budget.ru hangs from many networks (Client Hello
+# never reaches the VPS). Serve Line on the apex instead:
 #
-# DNS (same A record as badger-budget.ru):
-#   call.badger-budget.ru      A
-#   livekit.badger-budget.ru   A
+#   https://badger-budget.ru/call/
+#   wss://badger-budget.ru/lk
+#
+# Put these handles at the TOP of the existing (routes) snippet,
+# before the catch-all reverse_proxy to panel.
+
+# handle /call {
+# 	redir * /call/ 302
+# }
+# handle_path /call/* {
+# 	header Permissions-Policy "microphone=(self), camera=()"
+# 	reverse_proxy host.docker.internal:3080
+# }
+# handle /lk {
+# 	redir * /lk/ 302
+# }
+# handle_path /lk/* {
+# 	reverse_proxy host.docker.internal:7880 {
+# 		flush_interval -1
+# 	}
+# }
+
+# Optional extra hostnames (HTTP works; HTTPS on these names often hangs):
 
 call.badger-budget.ru {
 	header Permissions-Policy "microphone=(self), camera=()"
-	reverse_proxy 127.0.0.1:3080
+	reverse_proxy host.docker.internal:3080
 }
 
 livekit.badger-budget.ru {
-	reverse_proxy 127.0.0.1:7880 {
-		header_up Host {host}
-		header_up X-Forwarded-Proto {scheme}
+	reverse_proxy host.docker.internal:7880 {
 		flush_interval -1
 	}
 }
