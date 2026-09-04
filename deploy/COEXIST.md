@@ -1,50 +1,116 @@
-# Соседство LiveKit с уже существующим приложением
+# Соседство LiveKit с приложением на badger-budget.ru
 
-## Итог (зафиксировано)
+## Итог
 
 | Решение | Как |
 |---|---|
-| Машина и Docker | да, переиспользуем |
-| Порты 80/443 | нет, их уже держит текущее приложение через Caddy |
-| Порты LiveKit на хосте | свободны |
-| Firewall | UDP/ICE **ещё не пускает** — открыть руками |
-| Свой домен + DNS | пока нет |
-| Временные имена | **sslip.io** |
-| Как ставить | **отдельный compose** рядом, не в чужой стек |
-| HTTP(S) | новые `server_name` в **существующем Caddy**, не второй Caddy |
-| Медиа | UDP наружу руками, Caddy это не проксирует |
-
-LiveKit — отдельный процесс. Он не встраивается в текущее приложение и не занимает 80/443.
+| Машина и Docker | да |
+| 80/443 | не трогать — их держит текущий Caddy на `badger-budget.ru` |
+| LiveKit | отдельный compose `name: line` |
+| HTTP(S) | два новых сайта в **том же** Caddyfile |
+| DNS | `call.badger-budget.ru` и `livekit.badger-budget.ru` |
+| Медиа | UDP наружу руками, не через Caddy |
+| Firewall | 7881/tcp, 7882/udp, 3478/udp — открыть, сейчас закрыто |
 
 ```
 браузер
-  │  HTTPS  call.<ip>.sslip.io      → Caddy → 127.0.0.1:3080  (UI + token)
-  │  WSS    livekit.<ip>.sslip.io   → Caddy → 127.0.0.1:7880  (signaling)
-  └── UDP   :7882 и :3478 напрямую на хост (firewall), не через Caddy
+  │  HTTPS  call.badger-budget.ru     → Caddy → 127.0.0.1:3080  (UI + token)
+  │  WSS    livekit.badger-budget.ru  → Caddy → 127.0.0.1:7880  (signaling)
+  └── UDP   :7882 и :3478 напрямую на хост
 ```
 
-## Порты
+Текущий сайт `badger-budget.ru` не меняется.
 
-| Порт | Куда публиковать | Кто открывает наружу |
+---
+
+## 1. DNS
+
+В зоне `badger-budget.ru` два A-записи на **тот же IP**, что и основной сайт:
+
+| Имя | Тип | Значение |
 |---|---|---|
-| TCP 3080 | только `127.0.0.1` | Caddy |
-| TCP 7880 | только `127.0.0.1` | Caddy |
-| TCP 7881 | `0.0.0.0` | firewall |
-| UDP 7882 | `0.0.0.0` | firewall, руками |
-| UDP 3478 | `0.0.0.0` | firewall, руками |
-| TCP 80/443 | не трогать | уже Caddy текущего приложения |
+| `call` | A | IP сервера |
+| `livekit` | A | IP сервера |
 
-Проверка, что на хосте свободно:
+Проверка (с ноутбука, не только с VPS):
 
 ```bash
-ss -lntu | grep -E '7880|7881|7882|3478|3080'
+getent hosts call.badger-budget.ru livekit.badger-budget.ru badger-budget.ru
 ```
 
-## Firewall (обязательный шаг, сейчас закрыто)
+Все три должны показать один адрес. Пока DNS не указывает сюда, Caddy не получит сертификат — блоки в Caddyfile не добавлять раньше времени.
 
-Caddy UDP не возит. Без этих правил будет «подключились, тишина».
+Если в панели уже есть `*.badger-budget.ru` — отдельные A всё равно не мешают. Если в Caddy уже висит сайт `*.badger-budget.ru`, два конкретных имени выше приоритетнее; старый wildcard не удалять, пока не проверите, что он не единственный обработчик.
 
-UFW:
+---
+
+## 2. Caddy
+
+Нужно: **дописать** два блока в уже живой Caddyfile. Не ставить второй Caddy и не ставить официальный LiveKit-installer.
+
+1. Найти Caddyfile (часто `/etc/caddy/Caddyfile` или рядом с docker-compose текущего приложения).
+2. **Не удалять** блок `badger-budget.ru` / `www.badger-budget.ru`.
+3. В конец файла вставить содержимое `deploy/Caddyfile.example`.
+4. Проверить и перечитать:
+
+```bash
+caddy validate --config /etc/caddy/Caddyfile
+# или, если Caddy в docker:
+# docker exec <caddy-container> caddy validate --config /etc/caddy/Caddyfile
+
+systemctl reload caddy
+# если Caddy в docker — recreate/reload того контейнера, который уже слушает 80/443
+```
+
+Готовые блоки:
+
+```caddy
+call.badger-budget.ru {
+	reverse_proxy 127.0.0.1:3080
+}
+
+livekit.badger-budget.ru {
+	reverse_proxy 127.0.0.1:7880 {
+		header_up Host {host}
+		header_up X-Forwarded-Proto {scheme}
+		flush_interval -1
+	}
+}
+```
+
+Caddy сам возьмёт Let's Encrypt на новые имена (HTTP-01 на уже открытом 80).
+
+После reload: `curl -sI https://call.badger-budget.ru/api/health` начнёт отвечать, когда поднимется compose с UI. До этого Caddy может отдать 502 — это нормально.
+
+Если Caddy крутится в Docker **без** `network_mode: host`, `127.0.0.1` внутри его контейнера — не хост. Тогда в `reverse_proxy` нужен `host.docker.internal` или IP docker-моста, не 127.0.0.1. Если Caddy на хосте (systemd) — оставляйте `127.0.0.1`.
+
+---
+
+## 3. Firewall
+
+Caddy UDP не проксирует. Без этих трёх правил браузер дойдёт по WSS, а звука не будет.
+
+**Не открывать** 3080 и 7880 наружу — они должны остаться на localhost. **Не трогать** 80/443.
+
+### Какой firewall стоит
+
+```bash
+command -v ufw && ufw status verbose
+command -v firewall-cmd && firewall-cmd --state
+iptables -L INPUT -n | head
+```
+
+Ещё проверьте панель хостера (Security Group / Firewall в Timeweb, Selectel, Hetzner, AWS): правила ufw на машине не помогут, если UDP режется выше.
+
+### UFW (Ubuntu)
+
+Сначала посмотреть, включён ли:
+
+```bash
+ufw status verbose
+```
+
+Если `Status: inactive` — не делать `ufw enable`, пока не убедитесь, что 22/tcp и 80,443 уже в правилах. Иначе можно отрезать SSH. Когда UFW уже работает (типично, раз «порты не пускает»):
 
 ```bash
 ufw allow 7881/tcp comment 'livekit ice-tcp'
@@ -54,51 +120,47 @@ ufw reload
 ufw status numbered
 ```
 
-firewalld:
+Должны появиться:
+
+```
+7881/tcp    ALLOW    Anywhere
+7882/udp    ALLOW    Anywhere
+3478/udp    ALLOW    Anywhere
+```
+
+### firewalld
 
 ```bash
 firewall-cmd --permanent --add-port=7881/tcp
 firewall-cmd --permanent --add-port=7882/udp
 firewall-cmd --permanent --add-port=3478/udp
 firewall-cmd --reload
+firewall-cmd --list-ports
 ```
 
-Проверка снаружи (не с самого VPS): `nc -u -vz <ip> 7882` и TCP 7881. Если пакет не доходит — смотреть ещё облачный SG/security group, не только ufw.
+### Проверка снаружи
 
-## sslip.io (пока нет своего DNS)
+С другой машины (не с VPS):
 
-Пусть публичный IPv4 сервера будет `203.0.113.10` — подставьте свой:
+```bash
+nc -vz call.badger-budget.ru 7881
+nc -u -vz call.badger-budget.ru 7882
+nc -u -vz call.badger-budget.ru 3478
+```
 
-| Роль | Имя |
-|---|---|
-| UI + token | `call.203.0.113.10.sslip.io` |
-| LiveKit signaling | `livekit.203.0.113.10.sslip.io` |
+TCP 7881 должен соединиться. UDP часто не печатает «succeeded» — отсутствие ICMP unreachable уже хороший знак. Если с ноутбука timeout, а `ufw status` показывает ALLOW — режет облачный firewall, откройте те же три порта там.
 
-Проверка: `getent hosts call.203.0.113.10.sslip.io` должен вернуть тот же IP.
+---
 
-Caddy, который уже слушает 80/443, сам возьмёт Let's Encrypt на новые имена. Второй Caddy и официальный LiveKit-installer с Caddy на 443 — нельзя.
+## 4. Compose и .env
 
-Когда появится свой домен: те же два `server_name`, только `call.example.com` / `livekit.example.com`, и `LIVEKIT_URL=wss://livekit.example.com`.
+```bash
+cp deploy/.env.example deploy/.env
+# LIVEKIT_API_SECRET=$(openssl rand -hex 32)
+# LIVEKIT_URL=wss://livekit.badger-budget.ru
+cd deploy && docker compose up -d --build
+```
 
-## Постановка
+UI: https://call.badger-budget.ru — две вкладки, один код комнаты.
 
-1. Клонировать репо на VPS (или скопировать `deploy/` + `apps/`).
-2. `cp deploy/.env.example deploy/.env`
-3. `openssl rand -hex 32` → `LIVEKIT_API_SECRET` (не короче 32 символов).
-4. В `.env`: `LIVEKIT_URL=wss://livekit.<ваш-ip>.sslip.io`
-5. Дописать блоки из `Caddyfile.example` в **существующий** Caddyfile, подставить IP. Перезагрузить Caddy (`systemctl reload caddy` или как у вас принято). Старые сайты не удалять.
-6. Открыть UDP/ICE в firewall (команды выше).
-7. `cd deploy && docker compose up -d --build`
-8. UI: `https://call.<ip>.sslip.io` — две вкладки, один код комнаты.
-
-Compose **отдельный** (`name: line`). В чужой docker-compose текущего приложения сервисы не вписывать.
-
-`network_mode: host` не используем: на общей машине он сажает порты LiveKit прямо на хост и легче пересечься с уже живым стеком.
-
-## Чего по-прежнему нельзя
-
-- Проксировать UDP 7882/3478 через Caddy.
-- Занимать 80/443 вторым веб-сервером.
-- Считать sslip.io постоянным продакшеном: это временные имена до своего DNS.
-
-Пользователей текущего приложения в token API пока не подключаем: endpoint открытый, для проверки канала. Дальше — проверять их сессию и только потом подписывать LiveKit JWT.
+Compose отдельный (`name: line`). В compose текущего приложения на `badger-budget.ru` сервисы не вписывать.

@@ -319,6 +319,6 @@ idle → calling → ringing → in_call → ended
 Дальше:
 
 1. Прогнать две вкладки локально (`bash scripts/dev.sh`).
-2. На VPS — `deploy/COEXIST.md`: отдельный compose, Caddy `server_name`, sslip.io, UDP в firewall руками.
+2. На VPS — `deploy/COEXIST.md`: отдельный compose, Caddy на call/livekit.badger-budget.ru, UDP в firewall руками.
 3. Закрыть token endpoint авторизацией существующего приложения.
 4. Мобильные SDK, входящие, SIP/PSTN — только если понадобятся.
