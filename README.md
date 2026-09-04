@@ -12,7 +12,7 @@
          └──WSS──► LiveKit :7880  ──UDP 7882──► медиа
 ```
 
-LiveKit не заменяет текущее приложение на сервере. Он садится **отдельным compose** рядом. На VPS `157.22.252.10` TLS с интернета зависает (Client Hello не доходит), поэтому рабочий HTTPS — Pinggy-туннель по исходящему SSH/443 (`https://*.pinggy.*/call/`). HTTP `http://call.badger-budget.ru` открывает страницу, но микрофон в браузере без HTTPS не включится.
+LiveKit не заменяет текущее приложение на сервере. Он садится **отдельным compose** рядом: в Caddy на `badger-budget.ru` добавляются `/call` и `/lk` (и опционально `call.` / `livekit.`). HTTPS только TLS 1.2 — рекомендация AdminVPS против ТСПУ. UDP для медиа открывается в firewall руками.
 
 Итог и команды: [deploy/COEXIST.md](./deploy/COEXIST.md).
 
@@ -33,4 +33,4 @@ bash scripts/dev.sh
 
 ## На сервере рядом с другим приложением
 
-Не ставить официальный инсталлятор LiveKit с Caddy на 80/443 — он отберёт порты. Использовать `deploy/docker-compose.yml` (там же туннель) и дописать сайты из `deploy/Caddyfile.example` в уже живой Caddy. Firewall UDP — руками. Подробности в [deploy/COEXIST.md](./deploy/COEXIST.md).
+Не ставить официальный инсталлятор LiveKit с Caddy на 80/443 — он отберёт порты. Использовать `deploy/docker-compose.yml` и дописать сайты из `deploy/Caddyfile.example` в уже живой Caddy. Firewall UDP — руками. Подробности в [deploy/COEXIST.md](./deploy/COEXIST.md).

@@ -7,21 +7,19 @@
 | Машина и Docker | да |
 | 80/443 | не трогать — их держит текущий Caddy на `badger-budget.ru` |
 | LiveKit | отдельный compose `name: line` |
-| HTTP на домене | `http://call.badger-budget.ru` и `http://badger-budget.ru/call/` |
-| Рабочий HTTPS | Pinggy SSH-туннель в том же compose (исходящий TCP 443 → `https://*.pinggy.* /call/`) |
-| DNS | `call.badger-budget.ru` и `livekit.badger-budget.ru` (HTTP; TLS до IP с интернета зависает) |
+| HTTPS | тот же Caddy; **только TLS 1.2** (ТСПУ в РФ режет часть TLS 1.3 ClientHello — [AdminVPS](https://my.adminvps.ru/knowledgebase/559/reshenie-chastichnoi-nedostupnosti-coedinenii-s-tls-13-v-setiakh-rf.html)) |
+| DNS | `call.badger-budget.ru` и `livekit.badger-budget.ru` |
 | Медиа | UDP наружу руками, не через Caddy |
 | Firewall | 7881/tcp, 7882/udp, 3478/udp |
 
 ```
 браузер
-  │  HTTPS  *.pinggy.*/call/          → ssh -p 443 → edge → :3080  (UI + token)
-  │  WSS    *.pinggy.*/lk             → ssh -p 443 → edge → :7880  (signaling)
-  │  HTTP   call.badger-budget.ru     → Caddy → :3080  (страница без микрофона)
+  │  HTTPS  badger-budget.ru/call/    → Caddy → :3080  (UI + token)
+  │  WSS    badger-budget.ru/lk       → Caddy → :7880  (signaling)
   └── UDP   :7882 и :3478 напрямую на хост
 ```
 
-TLS на `badger-budget.ru:443` с публичного интернета не открывается: TCP соединяется, Client Hello не доходит до NIC (на самой VPS `curl https://127.0.0.1` работает). Исходящий Cloudflare Tunnel на 7844 тоже застревает. Пока хостер это не снимет, звонки — через Pinggy (SSH на 443). Бесплатный Pinggy живёт ~60 минут и переподключается с новым URL; актуальная ссылка на `http://call.badger-budget.ru` и в `/api/health`. Устойчивый hostname на своём домене: оранжевое облако Cloudflare (Flexible SSL → origin HTTP :80) или платный Pinggy-токен.
+UI: `https://badger-budget.ru/call/` — две вкладки, один код комнаты.
 
 В HTTP-блоке apex **нельзя** писать голый `redir https://…` рядом с `handle /call*` — Caddy компилирует `redir` раньше `handle`. Нужно `handle { redir … }`.
 
@@ -161,22 +159,12 @@ TCP 7881 должен соединиться. UDP часто не печатае
 ```bash
 cp deploy/.env.example deploy/.env
 # LIVEKIT_API_SECRET=$(openssl rand -hex 32)
-# LIVEKIT_URL=wss://livekit.badger-budget.ru
+# LIVEKIT_URL=wss://badger-budget.ru/lk
 cd deploy && docker compose up -d --build
 ```
 
-UI по HTTP: http://call.badger-budget.ru — страница откроется, микрофон нет.
+UI: https://badger-budget.ru/call/ — две вкладки, один код комнаты.
 
-Рабочий HTTPS после `docker compose up -d --build`:
-
-```bash
-# подождать ~15 с, пока pinggy напечатает URL
-docker logs line-tunnel-1 2>&1 | grep pinggy | tail
-# или:
-cat runtime/https-url
-curl -s http://127.0.0.1:3080/api/health
-```
-
-Откройте `https://<из файла>/call/` — две вкладки, один код комнаты.
+Caddy HTTPS-сайты — `tls { protocols tls1.2 tls1.2 }` (сниппет `(tls12)` в `Caddyfile.example`). Если HTTPS всё ещё зависает из конкретной сети — это ТСПУ на пути, не приложение; тогда тикет хостеру со ссылкой на их же [статью про TLS 1.3](https://my.adminvps.ru/knowledgebase/559/reshenie-chastichnoi-nedostupnosti-coedinenii-s-tls-13-v-setiakh-rf.html).
 
 Compose отдельный (`name: line`). В compose текущего приложения на `badger-budget.ru` сервисы не вписывать.
